@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LiveOps AI Dashboard</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --brand:#7c3aed;--brand-l:#ede9fe;--brand-d:#5b21b6;
+  --ok:#059669;--warn:#d97706;--err:#dc2626;
+  --bg:#f9fafb;--bg2:#ffffff;--bg3:#f3f4f6;
+  --txt:#111827;--txt2:#6b7280;--txt3:#9ca3af;
+  --border:#e5e7eb;--border2:#d1d5db;
+  --radius:8px;--radius-lg:12px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#0f0f11;--bg2:#1a1a1f;--bg3:#222228;
+    --txt:#f3f4f6;--txt2:#9ca3af;--txt3:#6b7280;
+    --border:#2d2d35;--border2:#3d3d48;
+  }
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:var(--txt);background:var(--bg);min-height:100vh}
+
+/* LAYOUT */
+.app{max-width:960px;margin:0 auto;padding:0 0 40px}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100}
+.logo{font-weight:700;font-size:15px;color:var(--brand);padding:14px 0;white-space:nowrap}
+.tabs{display:flex;overflow-x:auto;flex:1}
+.tab{padding:14px 14px;font-size:12px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--txt2);white-space:nowrap;transition:all .15s}
+.tab.active{color:var(--brand);border-bottom-color:var(--brand)}
+.tab:hover:not(.active){color:var(--txt)}
+.top-user{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--brand-l);color:var(--brand);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+
+.panel{display:none;padding:20px}
+.panel.active{display:block}
+
+/* FORM */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11px;color:var(--txt2);font-weight:500}
+input[type=number],input[type=text],select,textarea{
+  width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:var(--radius);
+  font-size:13px;background:var(--bg2);color:var(--txt);outline:none;transition:border .15s;font-family:inherit
+}
+input:focus,select:focus,textarea:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(124,58,237,.1)}
+textarea{resize:vertical;min-height:72px}
+.sl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin-bottom:8px;margin-top:16px}
+.sl:first-child{margin-top:0}
+
+/* METRICS */
+.metric-card{background:var(--bg3);border-radius:var(--radius);padding:12px 14px;border:1px solid var(--border)}
+.metric-card .lbl{font-size:10px;color:var(--txt3);margin-bottom:4px;font-weight:500}
+.metric-card .val{font-size:20px;font-weight:600;color:var(--txt)}
+.metric-card .dlt{font-size:10px;margin-top:3px}
+.up{color:var(--ok)}.down{color:var(--err)}.flat{color:var(--txt3)}
+
+/* CHIPS */
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid var(--border2);background:var(--bg2);color:var(--txt2);transition:all .12s;user-select:none}
+.chip.sel{background:var(--brand);border-color:var(--brand);color:#fff}
+
+/* BUTTONS */
+.btn{padding:8px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--brand);color:#fff;border:none}.btn-primary:hover{background:var(--brand-d)}.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--txt2);border:1px solid var(--border2)}.btn-ghost:hover{background:var(--bg3);color:var(--txt)}
+.btn-sm{padding:5px 10px;font-size:11px}
+.btn-danger{background:#fee2e2;color:#991b1b;border:none}.btn-danger:hover{background:#fecaca}
+
+/* UPLOAD */
+.upload-zone{border:2px dashed var(--border2);border-radius:var(--radius-lg);padding:24px;text-align:center;cursor:pointer;transition:all .15s;background:var(--bg3);position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--brand);background:var(--brand-l)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-zone .uz-icon{font-size:28px;margin-bottom:8px}
+.upload-zone .uz-text{font-size:13px;color:var(--txt2);font-weight:500}
+.upload-zone .uz-hint{font-size:11px;color:var(--txt3);margin-top:4px}
+
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{background:var(--bg3);padding:6px 8px;text-align:left;font-weight:600;color:var(--txt2);border-bottom:1px solid var(--border)}
+.data-table td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--txt)}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:var(--bg3)}
+.wrap-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius)}
+
+/* OUTPUT */
+.output-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-top:14px}
+.output-content{font-size:13px;line-height:1.8;color:var(--txt)}
+.output-content h3{font-size:13px;font-weight:600;margin:14px 0 7px;color:var(--txt)}
+.output-content h4{font-size:12px;font-weight:600;margin:10px 0 5px;color:var(--brand)}
+.output-content strong{font-weight:600}
+.loading-dots{display:inline-flex;gap:5px;padding:10px 0}
+.loading-dots span{width:7px;height:7px;border-radius:50%;background:var(--brand);animation:bounce .8s ease-in-out infinite}
+.loading-dots span:nth-child(2){animation-delay:.16s}
+.loading-dots span:nth-child(3){animation-delay:.32s}
+@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}
+
+/* CARDS */
+.server-card{border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:all .15s;background:var(--bg2)}
+.server-card:hover{border-color:var(--brand);box-shadow:0 0 0 3px rgba(124,58,237,.08)}
+.sc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:10px}
+.sc-title{font-weight:600;font-size:13px}
+.sc-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.sc-stat .slbl{font-size:10px;color:var(--txt3)}
+.sc-stat .sval{font-weight:600;font-size:13px}
+.sc-badges{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+
+/* TAGS */
+.tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap}
+.tag-new{background:#ede9fe;color:#5b21b6}.tag-mid{background:#fef3c7;color:#92400e}.tag-old{background:#fee2e2;color:#991b1b}
+.tag-up{background:#dcfce7;color:#14532d}.tag-down{background:#fee2e2;color:#991b1b}.tag-flat{background:var(--bg3);color:var(--txt3)}
+
+/* NOTICE */
+.notice{padding:10px 14px;border-radius:var(--radius);font-size:12px;margin-bottom:14px;line-height:1.6}
+.notice-info{background:#ede9fe;color:#4c1d95}
+.notice-warn{background:#fef3c7;color:#92400e}
+.notice-ok{background:#dcfce7;color:#14532d}
+.notice-err{background:#fee2e2;color:#991b1b}
+
+hr.div{border:none;border-top:1px solid var(--border);margin:16px 0}
+
+/* SETUP MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--bg2);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal h2{font-size:16px;font-weight:700;margin-bottom:6px}
+.modal p{font-size:12px;color:var(--txt2);margin-bottom:16px;line-height:1.6}
+.modal input{margin-bottom:10px}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+/* MECH LIST */
+.mech-list{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px}
+.mech-item{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
+.mech-item .mn{font-weight:500;font-size:12px}.mech-item .mt{font-size:10px;color:var(--txt3);margin-top:2px}
+
+/* HISTORY */
+.hi-item{border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all .15s;background:var(--bg2)}
+.hi-item:hover{border-color:var(--brand)}
+.hi-meta{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.hi-title{font-weight:600;font-size:12px}.hi-date{font-size:10px;color:var(--txt3)}
+.hi-preview{font-size:11px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.empty-state{text-align:center;padding:48px 20px;color:var(--txt3);font-size:13px}
+.empty-state .es-icon{font-size:32px;margin-bottom:10px}
+
+.sync-status{font-size:11px;color:var(--txt3);display:flex;align-items:center;gap:5px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex-shrink:0}
+.sync-dot.warn{background:var(--warn)}.sync-dot.err{background:var(--err)}
+
+.row{display:flex;gap:8px;align-items:flex-end}
+.row .field{flex:1}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">LiveOps AI</div>
+  <div class="tabs">
+    <div class="tab active" onclick="sw('overview')">📊 Overview</div>
+    <div class="tab" onclick="sw('input')">✏️ Weekly Input</div>
+    <div class="tab" onclick="sw('upload')">📂 Upload File</div>
+    <div class="tab" onclick="sw('mechanics')">⚙️ Mechanics</div>
+    <div class="tab" onclick="sw('history')">📁 Reports</div>
+  </div>
+  <div class="top-user">
+    <div class="sync-status" id="sync-status">
+      <div class="sync-dot warn" id="sync-dot"></div>
+      <span id="sync-text">Chưa kết nối</span>
+    </div>
+    <div class="avatar" id="top-av" onclick="showSetup()" title="Cài đặt">?</div>
+  </div>
+</div>
+
+<!-- ===== OVERVIEW ===== -->
+<div class="panel active" id="tab-overview">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div>
+      <div style="font-weight:700;font-size:16px">Team Dashboard</div>
+      <div style="font-size:12px;color:var(--txt3);margin-top:2px" id="ov-sub">Loading...</div>
+    </div>
+    <button class="btn btn-primary" onclick="sw('input')">+ Thêm báo cáo</button>
+  </div>
+  <div id="ov-cards">
+    <div class="empty-state"><div class="es-icon">📋</div>Chưa có báo cáo nào.<br>Nhấn "+ Thêm báo cáo" để bắt đầu.</div>
+  </div>
+</div>
+
+<!-- ===== WEEKLY INPUT ===== -->
+<div class="panel" id="tab-input">
+  <div class="notice notice-info">Nhập data tuần này. AI phân tích và đề xuất 2 event options phù hợp với giai đoạn server.</div>
+
+  <div class="sl">Người phụ trách & Server</div>
+  <div class="grid-3" style="margin-bottom:10px">
+    <div class="field"><label>Tên bạn</label><input type="text" id="inp-author" placeholder="VD: Tiến"/></div>
+    <div class="field"><label>Server / ID</label><input type="text" id="inp-server" placeholder="VD: S55 Thailand"/></div>
+    <div class="field"><label>Thị trường</label><input type="text" id="inp-market" placeholder="VD: TH, ID, PH"/></div>
+  </div>
+  <div class="grid-3" style="margin-bottom:10px">
+    <div class="field"><label>Giai đoạn Server</label>
+      <select id="inp-stage">
+        <option value="new">New Server (0-3 ngày)</option>
+        <option value="mid" selected>Mid Server (1-3 tháng)</option>
+        <option value="old">Old Server (3+ tháng)</option>
+      </select>
+    </div>
+    <div class="field"><label>Tình trạng Kinh tế</label>
+      <select id="inp-econ">
+        <option value="balanced">Cân bằng</option>
+        <option value="inflation">Lạm phát (tài nguyên thừa)</option>
+        <option value="deflation">Thiếu hụt tài nguyên</option>
+        <option value="whale-gap">Khoảng cách VIP - F2P lớn</option>
+      </select>
+    </div>
+    <div class="field"><label>Xu hướng mùa vụ</label>
+      <select id="inp-trend">
+        <option value="normal">Thường / Mid season</option>
+        <option value="holiday">Lễ / Tết / Hè (High)</option>
+        <option value="low">Thấp điểm (Low)</option>
+        <option value="boost">Đang chạy event</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="sl">KPI Tuần Này</div>
+  <div class="grid-4" style="margin-bottom:10px">
+    <div class="metric-card"><div class="lbl">DAU</div><div class="val" id="m-dau">-</div><div class="dlt flat" id="d-dau">-</div></div>
+    <div class="metric-card"><div class="lbl">Revenue</div><div class="val" id="m-rev">-</div><div class="dlt flat" id="d-rev">-</div></div>
+    <div class="metric-card"><div class="lbl">NRU</div><div class="val" id="m-nru">-</div><div class="dlt flat" id="d-nru">-</div></div>
+    <div class="metric-card"><div class="lbl">PU Rate</div><div class="val" id="m-pu">-</div><div class="dlt flat" id="d-pu">-</div></div>
+  </div>
+  <div class="grid-2" style="margin-bottom:10px">
+    <div class="field"><label>DAU tuần này</label><input type="number" id="dau-c" placeholder="1500" oninput="updM('dau')"/></div>
+    <div class="field"><label>DAU tuần trước</label><input type="number" id="dau-p" placeholder="1800" oninput="updM('dau')"/></div>
+    <div class="field"><label>Revenue tuần này</label><input type="text" id="rev-c" placeholder="45,000,000 VND" oninput="updM('rev')"/></div>
+    <div class="field"><label>Revenue tuần trước</label><input type="text" id="rev-p" placeholder="52,000,000 VND" oninput="updM('rev')"/></div>
+    <div class="field"><label>NRU (New Registered Users)</label><input type="number" id="nru-c" placeholder="200" oninput="updM('nru')"/></div>
+    <div class="field"><label>Paying User Rate (%)</label><input type="number" id="pu-c" placeholder="8.5" step="0.1" oninput="updM('pu')"/></div>
+  </div>
+
+  <div class="sl">Phản hồi cộng đồng</div>
+  <div class="field" style="margin-bottom:10px">
+    <textarea id="inp-feedback" placeholder="Bugs, khiếu nại, tâm lý user tuần này..."></textarea>
+  </div>
+
+  <div class="sl">Cơ chế đã dùng tuần này (chọn để AI biết tránh lặp)</div>
+  <div class="chips" id="inp-chips" style="margin-bottom:16px"></div>
+
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn btn-ghost" onclick="clearInp()">Xoá</button>
+    <button class="btn btn-primary" id="run-btn" onclick="runAI()">🤖 Phân tích &amp; Đề xuất Event</button>
+  </div>
+
+  <div id="out-area" style="display:none">
+    <div class="output-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="font-weight:600;font-size:13px">AI Analysis Output</span>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="copyOut()">📋 Copy</button>
+          <button class="btn btn-primary btn-sm" onclick="saveReport()">💾 Lưu &amp; Chia sẻ team</button>
+        </div>
+      </div>
+      <div class="output-content" id="out-text"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== UPLOAD ===== -->
+<div class="panel" id="tab-upload">
+  <div class="notice notice-info">Upload CSV hoặc Excel. Platform tự parse KPI và điền vào form.</div>
+  <div class="upload-zone" id="drop-zone">
+    <input type="file" accept=".csv,.xlsx,.xls" onchange="handleFile(this.files[0])" id="file-input"/>
+    <div class="uz-icon">📁</div>
+    <div class="uz-text">Kéo thả file vào đây hoặc click để chọn</div>
+    <div class="uz-hint">Hỗ trợ: CSV, Excel (.xlsx, .xls) · Max 5MB</div>
+  </div>
+  <div id="parse-status" style="display:none;margin-top:10px"></div>
+  <div id="parse-preview" style="display:none">
+    <hr class="div">
+    <div class="sl">Dữ liệu đọc được</div>
+    <div class="wrap-scroll"><table class="data-table" id="preview-table"></table></div>
+    <div id="parse-ok" class="notice notice-ok" style="margin-top:10px;display:none"></div>
+    <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="resetUpload()">Xoá file</button>
+      <button class="btn btn-primary" onclick="applyParsed()">✓ Áp dụng vào form</button>
+    </div>
+  </div>
+  <hr class="div">
+  <div class="sl">Template mẫu</div>
+  <p style="font-size:12px;color:var(--txt2);margin-bottom:8px">Download CSV template để team điền đúng format:</p>
+  <button class="btn btn-ghost btn-sm" onclick="dlTemplate()">⬇ Download CSV Template</button>
+</div>
+
+<!-- ===== MECHANICS ===== -->
+<div class="panel" id="tab-mechanics">
+  <div class="notice notice-warn">Cơ chế được lưu chung cho cả team qua Google Sheets. Thay đổi sẽ sync cho mọi người.</div>
+  <div class="mech-list" id="mech-list-wrap"></div>
+  <hr class="div">
+  <div class="sl">Thêm cơ chế mới</div>
+  <div class="row">
+    <div class="field"><label>Tên cơ chế</label><input type="text" id="nm-name" placeholder="VD: Săn Boss Thế Giới"/></div>
+    <div class="field"><label>Loại</label>
+      <select id="nm-type">
+        <option value="basic">In-game Cơ bản</option>
+        <option value="high">In-game High Conversion</option>
+        <option value="out">Outgame / Cộng đồng</option>
+      </select>
+    </div>
+    <div class="field"><label>Target</label>
+      <select id="nm-seg">
+        <option value="all">Tất cả</option>
+        <option value="vip">Super VIP</option>
+        <option value="low">Low VIP</option>
+        <option value="f2p">F2P</option>
+        <option value="churn">Churn User</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" style="flex-shrink:0;height:38px" onclick="addMech()">+ Thêm</button>
+  </div>
+</div>
+
+<!-- ===== HISTORY ===== -->
+<div class="panel" id="tab-history">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <div style="font-weight:600">Tất cả báo cáo</div>
+    <button class="btn btn-ghost btn-sm" onclick="loadAll()">🔄 Refresh</button>
+  </div>
+  <div id="hist-wrap">
+    <div class="empty-state"><div class="es-icon">📂</div>Chưa có báo cáo nào.</div>
+  </div>
+</div>
+
+<!-- SETUP MODAL -->
+<div class="modal-bg" id="setup-modal">
+  <div class="modal">
+    <h2>⚙️ Cài đặt kết nối</h2>
+    <p>Paste URL Google Apps Script vào đây để kết nối với Google Sheets database của team.</p>
+    <div class="field" style="margin-bottom:10px">
+      <label>Tên bạn (hiển thị trong team)</label>
+      <input type="text" id="cfg-user" placeholder="VD: Tiến"/>
+    </div>
+    <div class="field">
+      <label>Google Apps Script URL</label>
+      <input type="text" id="cfg-url" placeholder="https://script.google.com/macros/s/.../exec"/>
+    </div>
+    <div id="cfg-status" style="margin-top:10px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeSetup()">Để sau</button>
+      <button class="btn btn-ghost btn-sm" onclick="testConn()" id="test-btn">Kiểm tra kết nối</button>
+      <button class="btn btn-primary" onclick="saveSetup()">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ==================== CONFIG ====================
+const API_KEY_STORAGE = 'liveops_api_url';
+const USER_STORAGE = 'liveops_user';
+
+let GAS_URL = localStorage.getItem(API_KEY_STORAGE) || '';
+let username = localStorage.getItem(USER_STORAGE) || '';
+let reports = [];
+let mechs = [];
+let selMechs = [];
+let parsedData = null;
+let lastOut = '';
+
+const DEF_MECHS = [
+  {name:"Đăng nhập 7 ngày",type:"basic",seg:"all"},
+  {name:"Nạp tích lũy",type:"basic",seg:"low"},
+  {name:"Tiêu phí nhận thưởng",type:"basic",seg:"vip"},
+  {name:"Vòng quay Gacha",type:"basic",seg:"all"},
+  {name:"Gói bán giới hạn",type:"high",seg:"vip"},
+  {name:"Săn Boss",type:"basic",seg:"all"},
+  {name:"Kích Nạp Lần Đầu",type:"high",seg:"low"},
+  {name:"Mở Server Đặc biệt",type:"high",seg:"all"},
+  {name:"Chuyển Server",type:"high",seg:"all"},
+  {name:"Giải đấu Chiến Thần",type:"high",seg:"vip"},
+  {name:"Sự kiện UGC",type:"out",seg:"f2p"},
+  {name:"Quà tặng SMS/Email",type:"out",seg:"churn"},
+];
+
+// ==================== INIT ====================
+async function init(){
+  if(!GAS_URL){
+    showSetup();
+    mechs = DEF_MECHS;
+    renderChips(); renderMechList();
+    setSyncStatus('warn','Chưa kết nối GSheets');
+    return;
+  }
+  applyUser();
+  await loadAll();
+}
+
+function applyUser(){
+  if(username){
+    document.getElementById('top-av').textContent = username.slice(0,2).toUpperCase();
+    document.getElementById('inp-author').value = username;
+    document.getElementById('cfg-user').value = username;
+    document.getElementById('cfg-url').value = GAS_URL;
+  }
+}
+
+function setSyncStatus(state, msg){
+  document.getElementById('sync-text').textContent = msg;
+  const dot = document.getElementById('sync-dot');
+  dot.className = 'sync-dot' + (state==='ok'?'':' '+state);
+}
+
+// ==================== TABS ====================
+function sw(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const ids=['overview','input','upload','mechanics','history'];
+    t.classList.toggle('active', ids[i]===id);
+  });
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+}
+
+// ==================== SETUP MODAL ====================
+function showSetup(){ document.getElementById('setup-modal').style.display='flex'; }
+function closeSetup(){ document.getElementById('setup-modal').style.display='none'; }
+
+async function testConn(){
+  const url = document.getElementById('cfg-url').value.trim();
+  if(!url){ showCfgStatus('warn','Vui lòng nhập URL'); return; }
+  const btn = document.getElementById('test-btn');
+  btn.textContent='Đang kiểm tra...'; btn.disabled=true;
+  try{
+    const r = await fetch(url+'?action=getMechanics');
+    const d = await r.json();
+    if(d.ok !== false) showCfgStatus('ok','Kết nối thành công!');
+    else showCfgStatus('warn','Kết nối được nhưng response lạ. Kiểm tra lại script.');
+  }catch(e){
+    showCfgStatus('err','Lỗi kết nối. Kiểm tra lại URL và quyền deploy.');
+  }
+  btn.textContent='Kiểm tra kết nối'; btn.disabled=false;
+}
+
+function showCfgStatus(type, msg){
+  const el = document.getElementById('cfg-status');
+  el.style.display='block';
+  el.className = 'notice notice-'+(type==='ok'?'ok':type==='err'?'err':'warn');
+  el.textContent = msg;
+}
+
+function saveSetup(){
+  const url = document.getElementById('cfg-url').value.trim();
+  const user = document.getElementById('cfg-user').value.trim();
+  if(url){ GAS_URL = url; localStorage.setItem(API_KEY_STORAGE, url); }
+  if(user){ username = user; localStorage.setItem(USER_STORAGE, user); }
+  applyUser();
+  closeSetup();
+  loadAll();
+}
+
+// ==================== API ====================
+async function apiGet(action){
+  if(!GAS_URL) return null;
+  const r = await fetch(GAS_URL+'?action='+action);
+  return await r.json();
+}
+
+async function apiPost(body){
+  if(!GAS_URL) return null;
+  const r = await fetch(GAS_URL, {
+    method:'POST',
+    body: JSON.stringify(body)
+  });
+  return await r.json();
+}
+
+async function loadAll(){
+  if(!GAS_URL){ setSyncStatus('warn','Chưa kết nối'); return; }
+  setSyncStatus('warn','Đang tải...');
+  try{
+    const [rr, mr] = await Promise.all([apiGet('getReports'), apiGet('getMechanics')]);
+    if(rr && rr.ok !== false) reports = rr.data || [];
+    if(mr && mr.ok !== false && mr.data && mr.data.length > 0) mechs = mr.data;
+    else if(!mechs.length) mechs = DEF_MECHS;
+    renderOverview();
+    renderHistory();
+    renderChips();
+    renderMechList();
+    const sub = `${reports.length} báo cáo · Sync lúc ${new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'})}`;
+    document.getElementById('ov-sub').textContent = sub;
+    setSyncStatus('ok','Đã sync');
+  }catch(e){
+    setSyncStatus('err','Lỗi kết nối');
+  }
+}
+
+// ==================== OVERVIEW ====================
+function renderOverview(){
+  const w = document.getElementById('ov-cards');
+  if(!reports.length){
+    w.innerHTML='<div class="empty-state"><div class="es-icon">📋</div>Chưa có báo cáo nào.<br>Nhấn "+ Thêm báo cáo" để bắt đầu.</div>';
+    return;
+  }
+  w.innerHTML='';
+  [...reports].reverse().forEach(r=>{
+    const stageTag = {new:'tag-new',mid:'tag-mid',old:'tag-old'}[r.stage]||'tag-mid';
+    const stageLabel = {new:'New',mid:'Mid',old:'Old'}[r.stage]||'Mid';
+    const dauDelta = r.dau_c&&r.dau_p ? ((+r.dau_c - +r.dau_p)/+r.dau_p*100).toFixed(0) : null;
+    const dTag = dauDelta===null?'tag-flat':dauDelta>0?'tag-up':'tag-down';
+    const dStr = dauDelta===null?'DAU N/A':(+dauDelta>0?'DAU ▲':'DAU ▼')+Math.abs(dauDelta)+'%';
+    const el = document.createElement('div');
+    el.className='server-card';
+    el.innerHTML=`
+      <div class="sc-header">
+        <div>
+          <div class="sc-title">${r.server||'Unnamed'} <span style="font-weight:400;color:var(--txt3)">${r.market||''}</span></div>
+          <div style="font-size:11px;color:var(--txt3);margin-top:3px">by ${r.author||'?'} · ${r.date||''}</div>
+        </div>
+        <div class="sc-badges">
+          <span class="tag ${stageTag}">${stageLabel}</span>
+          <span class="tag ${dTag}">${dStr}</span>
+        </div>
+      </div>
+      <div class="sc-stats">
+        <div class="sc-stat"><div class="slbl">DAU</div><div class="sval">${r.dau_c?Number(r.dau_c).toLocaleString():'-'}</div></div>
+        <div class="sc-stat"><div class="slbl">Revenue</div><div class="sval">${r.rev_c||'-'}</div></div>
+        <div class="sc-stat"><div class="slbl">NRU</div><div class="sval">${r.nru?Number(r.nru).toLocaleString():'-'}</div></div>
+        <div class="sc-stat"><div class="slbl">PU Rate</div><div class="sval">${r.pu?r.pu+'%':'-'}</div></div>
+      </div>`;
+    el.onclick=()=>loadReport(r);
+    w.appendChild(el);
+  });
+}
+
+// ==================== HISTORY ====================
+function renderHistory(){
+  const w = document.getElementById('hist-wrap');
+  if(!reports.length){
+    w.innerHTML='<div class="empty-state"><div class="es-icon">📂</div>Chưa có báo cáo nào.</div>';
+    return;
+  }
+  w.innerHTML='';
+  [...reports].reverse().forEach((r,i)=>{
+    const el = document.createElement('div');
+    el.className='hi-item';
+    const preview=(r.output||'').replace(/[#*]/g,'').substring(0,130).trim()+'...';
+    el.innerHTML=`<div class="hi-meta">
+      <span class="hi-title">${r.server||'Unnamed'} ${r.market?'· '+r.market:''}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:10px;color:var(--txt3)">by ${r.author||'?'}</span>
+        <span class="hi-date">${r.date||''}</span>
+        <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();delReport('${r.id}')">Xoá</button>
+      </div>
+    </div>
+    <div class="hi-preview">${preview}</div>`;
+    el.onclick=()=>loadReport(r);
+    w.appendChild(el);
+  });
+}
+
+function loadReport(r){
+  lastOut = r.output||'';
+  const g = id=>document.getElementById(id);
+  g('inp-server').value=r.server||'';
+  g('inp-market').value=r.market||'';
+  g('inp-author').value=r.author||username||'';
+  if(r.dau_c){g('dau-c').value=r.dau_c;updM('dau');}
+  if(r.dau_p){g('dau-p').value=r.dau_p;updM('dau');}
+  if(r.rev_c){g('rev-c').value=r.rev_c;updM('rev');}
+  if(r.rev_p){g('rev-p').value=r.rev_p;}
+  if(r.nru){g('nru-c').value=r.nru;updM('nru');}
+  if(r.pu){g('pu-c').value=r.pu;updM('pu');}
+  g('out-area').style.display='block';
+  renderOutput(r.output||'');
+  sw('input');
+}
+
+async function delReport(id){
+  if(!confirm('Xoá báo cáo này khỏi Google Sheets?')) return;
+  try{
+    await apiPost({action:'deleteReport', id});
+    await loadAll();
+  }catch(e){ alert('Lỗi xoá báo cáo: '+e.message); }
+}
+
+// ==================== METRICS ====================
+function updM(type){
+  const get=id=>parseFloat(document.getElementById(id).value)||0;
+  if(type==='dau'){
+    const c=get('dau-c'),p=get('dau-p');
+    document.getElementById('m-dau').textContent=c?c.toLocaleString():'-';
+    if(c&&p){const d=((c-p)/p*100).toFixed(1);setDelta('d-dau',d);}
+  }
+  if(type==='rev'){
+    const c=document.getElementById('rev-c').value;
+    document.getElementById('m-rev').textContent=c||'-';
+  }
+  if(type==='nru'){
+    const c=get('nru-c');
+    document.getElementById('m-nru').textContent=c?c.toLocaleString():'-';
+  }
+  if(type==='pu'){
+    const c=get('pu-c');
+    document.getElementById('m-pu').textContent=c?c.toFixed(1)+'%':'-';
+  }
+}
+function setDelta(id,d){
+  const el=document.getElementById(id);
+  el.textContent=(d>0?'▲':'▼')+' '+Math.abs(d)+'% vs tuần trước';
+  el.className='dlt '+(+d>0?'up':'down');
+}
+
+// ==================== CHIPS ====================
+const typeL=t=>({basic:'In-game Cơ bản',high:'High Conversion',out:'Outgame'}[t]||t);
+const segL=s=>({all:'Tất cả',vip:'Super VIP',low:'Low VIP',f2p:'F2P',churn:'Churn'}[s]||s);
+
+function renderChips(){
+  const c=document.getElementById('inp-chips');
+  c.innerHTML='';
+  mechs.forEach((m,i)=>{
+    const ch=document.createElement('div');
+    ch.className='chip'+(selMechs.includes(i)?' sel':'');
+    ch.textContent=m.name;
+    ch.onclick=()=>{
+      selMechs.includes(i)?selMechs=selMechs.filter(x=>x!==i):selMechs.push(i);
+      renderChips();
+    };
+    c.appendChild(ch);
+  });
+}
+
+// ==================== MECHANICS ====================
+function renderMechList(){
+  const w=document.getElementById('mech-list-wrap');
+  w.innerHTML='';
+  mechs.forEach((m,i)=>{
+    const el=document.createElement('div');
+    el.className='mech-item';
+    el.innerHTML=`<div><div class="mn">${m.name}</div><div class="mt">${typeL(m.type)} · ${segL(m.seg)}</div></div>
+      <button class="btn btn-danger btn-sm" onclick="rmMech(${i})">Xoá</button>`;
+    w.appendChild(el);
+  });
+}
+function addMech(){
+  const n=document.getElementById('nm-name').value.trim();
+  if(!n)return;
+  mechs.push({name:n,type:document.getElementById('nm-type').value,seg:document.getElementById('nm-seg').value});
+  syncMechs();
+  document.getElementById('nm-name').value='';
+}
+function rmMech(i){ mechs.splice(i,1); syncMechs(); }
+async function syncMechs(){
+  renderMechList(); renderChips();
+  if(GAS_URL) await apiPost({action:'saveMechanics',data:mechs});
+}
+
+// ==================== AI ====================
+function buildPrompt(){
+  const stageMap={new:'New Server (0-3 ngày)',mid:'Mid Server (1-3 tháng)',old:'Old Server (3+ tháng)'};
+  const econMap={balanced:'Cân bằng',inflation:'Lạm phát - tài nguyên thừa',deflation:'Thiếu hụt tài nguyên','whale-gap':'Khoảng cách VIP-F2P lớn'};
+  const trendMap={normal:'Thường/Mid season',holiday:'Lễ/Tết/Hè - High peak',low:'Thấp điểm',boost:'Đang chạy event'};
+  const g=id=>document.getElementById(id).value;
+  const usedMechs=selMechs.map(i=>mechs[i].name).join(', ')||'Chưa chọn';
+  const allMechs=mechs.map(m=>`- ${m.name} (${typeL(m.type)}, target: ${segL(m.seg)})`).join('\n');
+  return `Bạn là LiveOps Expert & Game Economy Designer. Phân tích data sau theo đúng cấu trúc.
+
+=== DỮ LIỆU TUẦN NÀY ===
+Server: ${g('inp-server')||'N/A'} | Thị trường: ${g('inp-market')||'N/A'}
+Giai đoạn: ${stageMap[g('inp-stage')]}
+DAU: ${g('dau-c')||'N/A'} (tuần trước: ${g('dau-p')||'N/A'})
+Revenue: ${g('rev-c')||'N/A'} (tuần trước: ${g('rev-p')||'N/A'})
+NRU: ${g('nru-c')||'N/A'} | Paying User Rate: ${g('pu-c')||'N/A'}%
+Tình trạng kinh tế: ${econMap[g('inp-econ')]}
+Xu hướng mùa vụ: ${trendMap[g('inp-trend')]}
+Phản hồi cộng đồng: ${g('inp-feedback')||'Không có'}
+
+=== CƠ CHẾ ĐÃ DÙNG TUẦN NÀY ===
+${usedMechs}
+
+=== TOÀN BỘ CƠ CHẾ AVAILABLE ===
+${allMechs}
+
+=== YÊU CẦU OUTPUT (tiếng Việt, Markdown) ===
+
+## 1. Phân Tích Tình Trạng
+Chẩn đoán lý do tăng/giảm chỉ số. Định vị server. Đánh giá tâm lý user. Ngắn gọn, sắc bén.
+
+## 2. Đề Xuất Sự Kiện
+
+### Option A: [Tên Event]
+**Cơ chế:** (chỉ dùng từ danh sách available)
+**Mục tiêu & Đối tượng:**
+**Cơ cấu Thưởng & Thông số:**
+**Dự phóng Tác động:**
+
+### Option B: [Tên Event]
+**Cơ chế:**
+**Mục tiêu & Đối tượng:**
+**Cơ cấu Thưởng & Thông số:**
+**Dự phóng Tác động:**
+
+## 3. Hành Động Bổ Trợ
+(Outgame, UGC, Recall, bug cần fix, thông điệp truyền thông)`;
+}
+
+async function runAI(){
+  const btn=document.getElementById('run-btn');
+  btn.disabled=true; btn.innerHTML='<span style="display:inline-flex;gap:3px"><span class="loading-dots"><span></span><span></span><span></span></span></span> Đang phân tích...';
+  const outArea=document.getElementById('out-area');
+  const outText=document.getElementById('out-text');
+  outArea.style.display='block';
+  outText.innerHTML='<div class="loading-dots"><span></span><span></span><span></span></div>';
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system:'Bạn là chuyên gia LiveOps Game. Phân tích sắc bén, thực tế. Chỉ dùng cơ chế có trong danh sách available. Không dùng dấu em dash.',
+        messages:[{role:'user',content:buildPrompt()}]
+      })
+    });
+    const data=await resp.json();
+    const text=data.content?.find(b=>b.type==='text')?.text||'Lỗi: Không nhận được phản hồi.';
+    lastOut=text;
+    renderOutput(text);
+  }catch(e){
+    outText.textContent='Lỗi kết nối API: '+e.message;
+  }
+  btn.disabled=false; btn.innerHTML='🤖 Phân tích &amp; Đề xuất Event';
+}
+
+function renderOutput(text){
+  const html=text
+    .replace(/^## (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^### (.+)$/gm,'<h4>$1</h4>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n/g,'<br>');
+  document.getElementById('out-text').innerHTML=html;
+}
+
+async function saveReport(){
+  if(!lastOut){alert('Chưa có output để lưu.');return;}
+  if(!GAS_URL){alert('Chưa kết nối Google Sheets. Vào cài đặt để setup.');return;}
+  const g=id=>document.getElementById(id).value;
+  const r={
+    id:Date.now().toString(),
+    author:g('inp-author')||username||'Unknown',
+    server:g('inp-server'),market:g('inp-market'),stage:g('inp-stage'),
+    dau_c:g('dau-c'),dau_p:g('dau-p'),rev_c:g('rev-c'),rev_p:g('rev-p'),
+    nru:g('nru-c'),pu:g('pu-c'),
+    date:new Date().toLocaleDateString('vi-VN'),
+    output:lastOut
+  };
+  try{
+    await apiPost({action:'saveReport',data:r});
+    reports.push(r);
+    renderOverview(); renderHistory();
+    alert('Đã lưu và sync lên Google Sheets! Team có thể thấy ngay.');
+  }catch(e){ alert('Lỗi lưu báo cáo: '+e.message); }
+}
+
+function copyOut(){ navigator.clipboard.writeText(lastOut).then(()=>alert('Đã copy!')); }
+
+function clearInp(){
+  ['inp-server','inp-market','inp-author','dau-c','dau-p','rev-c','rev-p','nru-c','pu-c','inp-feedback'].forEach(id=>document.getElementById(id).value='');
+  selMechs=[]; renderChips();
+  document.getElementById('out-area').style.display='none';
+  ['m-dau','m-rev','m-nru','m-pu'].forEach(id=>document.getElementById(id).textContent='-');
+  ['d-dau','d-rev','d-nru','d-pu'].forEach(id=>{const e=document.getElementById(id);e.textContent='-';e.className='dlt flat';});
+  lastOut='';
+}
+
+// ==================== FILE UPLOAD ====================
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+
+const KPI_MAP={
+  dau:['dau','daily active','daily_active'],
+  dau_prev:['dau prev','dau_prev','dau previous','previous dau','last week dau'],
+  revenue:['revenue','rev','doanh thu'],
+  rev_prev:['revenue prev','rev prev','previous revenue','last week revenue'],
+  nru:['nru','new user','new registered'],
+  pu_rate:['pu rate','pu%','paying rate','paying user'],
+  server:['server','server name','tên server'],
+  market:['market','thi truong','country'],
+  feedback:['feedback','phan hoi','community','note'],
+};
+
+function matchKey(h){
+  const lh=h.toLowerCase().trim();
+  for(const [k,aliases] of Object.entries(KPI_MAP)){
+    if(aliases.some(a=>lh.includes(a))) return k;
+  }
+  return null;
+}
+
+function handleFile(file){
+  if(!file) return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  const st=document.getElementById('parse-status');
+  st.style.display='block';
+  st.innerHTML='<div class="notice notice-info">Đang đọc file...</div>';
+  if(ext==='csv'){
+    const reader=new FileReader();
+    reader.onload=e=>parseCSV(e.target.result);
+    reader.readAsText(file,'UTF-8');
+  } else if(['xlsx','xls'].includes(ext)){
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        parseCSV(XLSX.utils.sheet_to_csv(ws));
+      }catch(err){ st.innerHTML=`<div class="notice notice-err">Lỗi đọc Excel: ${err.message}</div>`; }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    st.innerHTML='<div class="notice notice-warn">Định dạng không hỗ trợ.</div>';
+  }
+}
+
+function parseCSV(csv){
+  const lines=csv.trim().split('\n').filter(l=>l.trim());
+  if(lines.length<2){ document.getElementById('parse-status').innerHTML='<div class="notice notice-warn">File cần ít nhất 2 dòng.</div>'; return; }
+  const headers=lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
+  const values=lines[1].split(',').map(v=>v.replace(/"/g,'').trim());
+  const mapped={};
+  headers.forEach((h,i)=>{ const k=matchKey(h); if(k) mapped[k]=values[i]; });
+  parsedData=mapped;
+  document.getElementById('parse-status').innerHTML=`<div class="notice notice-ok">Đọc thành công! Nhận diện ${Object.keys(mapped).length}/${headers.length} cột.</div>`;
+  const tbl=document.getElementById('preview-table');
+  tbl.innerHTML=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr><tr>${values.map(v=>`<td>${v}</td>`).join('')}</tr>`;
+  const ok=document.getElementById('parse-ok');
+  if(Object.keys(mapped).length>0){ ok.style.display='block'; ok.textContent='Nhận diện: '+Object.keys(mapped).map(k=>`${k} = "${mapped[k]}"`).join(' · '); }
+  document.getElementById('parse-preview').style.display='block';
+}
+
+function applyParsed(){
+  if(!parsedData) return;
+  const p=parsedData, g=id=>document.getElementById(id);
+  if(p.server) g('inp-server').value=p.server;
+  if(p.market) g('inp-market').value=p.market;
+  if(p.dau){g('dau-c').value=p.dau;updM('dau');}
+  if(p.dau_prev){g('dau-p').value=p.dau_prev;updM('dau');}
+  if(p.revenue){g('rev-c').value=p.revenue;updM('rev');}
+  if(p.rev_prev){g('rev-p').value=p.rev_prev;}
+  if(p.nru){g('nru-c').value=p.nru;updM('nru');}
+  if(p.pu_rate){g('pu-c').value=p.pu_rate;updM('pu');}
+  if(p.feedback) g('inp-feedback').value=p.feedback;
+  alert('Đã áp dụng vào form!');
+  sw('input');
+}
+
+function resetUpload(){
+  parsedData=null;
+  document.getElementById('parse-preview').style.display='none';
+  document.getElementById('parse-status').style.display='none';
+  document.getElementById('file-input').value='';
+}
+
+function dlTemplate(){
+  const csv='server,market,dau,dau_prev,revenue,rev_prev,nru,pu_rate,feedback\nS55 Thailand,TH,1500,1800,45000000,52000000,200,8.5,"User phàn nàn PvP mất cân bằng"';
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='liveops_template.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Start
+if(!GAS_URL){
+  mechs=DEF_MECHS; renderChips(); renderMechList();
+  setSyncStatus('warn','Chưa kết nối GSheets');
+  showSetup();
+} else {
+  applyUser();
+  init();
+}
+</script>
+</body>
+</html>
